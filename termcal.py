@@ -4,6 +4,9 @@ import urllib2
 import urllib
 import os
 
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+
 from apiclient import discovery
 import oauth2client
 from oauth2client import client
@@ -17,10 +20,9 @@ try:
 except ImportError:
     flags = None
 
-SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
+SCOPES = 'https://www.googleapis.com/auth/calendar'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Terminal Calendar'
-
 
 def get_credentials():
     home_dir = os.path.expanduser('~')
@@ -71,15 +73,43 @@ def get_events(service, calendar):
         if 'summary' in event:
             print(start, event['summary'])
 
+def add_event(service, quicktext):
+    created_event = service.events().quickAdd(
+    calendarId='primary',
+    text=quicktext).execute()
+
 def main():
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
 
-    calendars = get_calendars(service)
-    for calendar in calendars:
-        events = get_events(service, calendar)
-        # break
+    driver = webdriver.Firefox()
+    driver.get("https://finalexams.rutgers.edu/")
+    assert "Final Exam Schedules" in driver.title
+    driver.find_element_by_link_text('Login').click()
+    elem = driver.find_element_by_name("username")
+    username = raw_input("What is your netid?")
+    elem.send_keys(username)
+    username = raw_input("What is your password?")
+    elem = driver.find_element_by_name("password")
+    elem.send_keys(password)
+    elem.send_keys(Keys.RETURN)
+    # assert "No results found." not in driver.page_source
+    assert "Final Exam Schedules" in driver.title
+
+    table = driver.find_elements_by_css_selector('table>tbody>tr')
+    for row in table:
+        cells = row.find_elements_by_css_selector('table>tbody>tr>td')
+        print(cells[3].text, ' ', cells[5].text)
+        quicktext = str(cells[3].text) + ' FINAL ' + str(cells[5].text)
+        add_event(service, quicktext)
+
+    driver.close()
+
+    # calendars = get_calendars(service)
+    # for calendar in calendars:
+    #     events = get_events(service, calendar)
+    #     # break
 
 if __name__ == '__main__':
     main()
